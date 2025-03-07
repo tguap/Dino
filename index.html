@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
   <title>Gioco: Pulizia & Dino</title>
   <style>
     body {
       margin: 0;
       overflow: hidden;
       background: #ddd;
+      touch-action: manipulation; 
+            overflow: hidden;
     } 
-    /* I canvas occupano tutta la larghezza disponibile e sono centrati */
+ 
     canvas {
       display: block;
       margin: 10px auto;
@@ -134,6 +136,11 @@
     let dinoGravity = 0.6;
     let collisionCooldown = false;
 
+document.addEventListener('dblclick', function(e) {
+    e.preventDefault();
+});
+
+    
     document.addEventListener('keydown', function(e) {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
        
