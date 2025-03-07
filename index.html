@@ -169,7 +169,7 @@ document.addEventListener('touchend', function(e) {
 
 
     function update() {
-      
+       resizeCanvases();
       updateTopGame();
       updateBottomGame();
       drawTopGame();
@@ -427,7 +427,7 @@ document.addEventListener('touchend', function(e) {
     
     
   fetching=false;addStains(25);
-         resizeCanvases();
+        
     if(start==false){start=true;
        
         update();}
