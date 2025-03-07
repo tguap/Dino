@@ -427,8 +427,9 @@ document.addEventListener('touchend', function(e) {
     
     
   fetching=false;addStains(25);
+         resizeCanvases();
     if(start==false){start=true;
-        resizeCanvases();
+       
         update();}
       } catch (error) {
         alert("Error: " + error.message);
