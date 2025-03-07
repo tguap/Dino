@@ -204,8 +204,8 @@ document.addEventListener('touchend', function(e) {
       // Rimuove le macchie se la pallina le "tocca"
       for (let i = stains.length - 1; i >= 0; i--) {
         let stain = stains[i];
-        let dx = ball.x - stain.x;
-        let dy = ball.y - stain.y;
+        let dx = ball.x - stain.x*topCanvas.width;
+        let dy = ball.y - stain.y*topCanvas.height;
         let distance = Math.hypot(dx, dy);
         if (distance < ball.radius + stain.radius) {
           stains.splice(i, 1);
@@ -229,7 +229,7 @@ document.addEventListener('touchend', function(e) {
       for (let i = 0; i < stains.length; i++) {
         let stain = stains[i];
         topCtx.save();
-        topCtx.translate(stain.x, stain.y);
+        topCtx.translate(stain.x*topCanvas.width, stain.y*topCanvas.height);
         topCtx.rotate(stain.angle);
         if (stainImage.complete) {
           topCtx.drawImage(stainImage, -stain.radius, -stain.radius, stain.radius * 2, stain.radius * 2);
@@ -378,8 +378,8 @@ document.addEventListener('touchend', function(e) {
       if(!fetching){
       for (let i = 0; i < nnn; i++) {
         stains.push({
-          x: Math.random() * (topCanvas.width - 40) + 20,
-          y: Math.random() * (topCanvas.height - 40) + 20,
+          x: Math.random(),
+          y: Math.random(),
           radius: Math.random() * 75 + 25,
           angle: Math.random() * Math.PI * 2
         });  
