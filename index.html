@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>Gioco: Pulizia & Dino</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #ddd;
+    } 
+    /* I canvas occupano tutta la larghezza disponibile e sono centrati */
+    canvas {
+      display: block;
+      margin: 10px auto;
+      border: 2px solid #000;
+    }
+  </style>
+  <!-- Includo la libreria gifler per l'animazione della GIF del dinosauro -->
+  <script src="https://cdn.jsdelivr.net/npm/gifler@0.1.0/gifler.min.js"></script>
+</head>
+<body>
+  <form id="urlForm">
+    <label for="urlInput">Insert URL:</label>
+    <input type="text" id="urlInput" placeholder="https://gallery.com" required>
+    <button type="submit">Extract images</button>
+  </form>
+ <div id="mydiv">
+  <canvas id="topCanvas"></canvas>
+  <canvas id="bottomCanvas"></canvas></div>
+ 
+  <script>
+    /***********************
+     * GESTIONE DEL RESIZING
+     ***********************/
+    const topCanvas = document.getElementById('topCanvas');
+    const topCtx = topCanvas.getContext('2d');
+    const bottomCanvas = document.getElementById('bottomCanvas');
+    const bottomCtx = bottomCanvas.getContext('2d');
+        document.getElementById('mydiv').style.display = "none";
+    let topBgImage= new Image();
+    let fetching=false;
+    let start=false;
+  
+    let timervinto;
+    function resizeCanvases() {
+       
+      // Bottom canvas: larghezza pari a quella della finestra, altezza fissa 150 px
+      bottomCanvas.width = window.innerWidth;
+      bottomCanvas.height = 150;
+
+      // Top canvas: larghezza pari alla finestra; altezza calcolata in base all'aspect ratio dell'immagine di sfondo
+      if (topBgImage.complete && topBgImage.naturalWidth) {
+        const aspect = topBgImage.naturalHeight / topBgImage.naturalWidth;
+        let w1=window.innerWidth;
+        let h1=w1 * aspect;
+        
+        let h2=window.innerHeight-150;
+        let w2=h2/aspect;
+        
+        let wf;let hf;
+        if(w1*h1>w2*h2){wf=w1;hf=h1;}else{wf=w2;hf=h2;}
+        let fit=false;
+        while(!fit){
+          if(wf<=window.innerWidth&&hf<=window.innerHeight-150){fit=true;}
+          else{wf--;hf=wf * aspect;}
+        }
+        topCanvas.width = wf;
+        topCanvas.height = hf;
+      } else {
+        // Se l'immagine non è ancora caricata, usiamo un rapporto di default (es. 2:1)
+        topCanvas.width = window.innerWidth;
+        topCanvas.height = window.innerWidth * 0.5;
+      }
+    }
+    window.addEventListener('load', resizeCanvases);
+    window.addEventListener('resize', resizeCanvases);
+
+    const stainImage = new Image();
+    stainImage.src = "https://dbdzm869oupei.cloudfront.net/img/sticker/preview/389.png";
+
+    const groundImg = new Image();
+    groundImg.src = "https://opengameart.org/sites/default/files/terrain_7.png";
+
+    const cactusImg = new Image();
+    cactusImg.src = "https://clipground.com/images/cactus-png-clipart-4.png";
+
+    const dinoBgImage = new Image();
+    dinoBgImage.src = "https://static.vecteezy.com/system/resources/previews/000/366/121/original/seamless-clouds-floating-in-the-sky-vector.jpg";
+
+    /*************************************************
+     * GESTIONE DEL DINOSAURO CON GIFLER (animazione)
+     *************************************************/
+    // Creiamo un canvas offscreen per l'animazione della GIF
+    const dinoCanvas = document.createElement("canvas");
+    const dinoCtx = dinoCanvas.getContext("2d");
+    gifler("https://nyzheng.github.io/dino/dino.gif").get(function(anim) {
+      dinoCanvas.width = anim.width;
+      dinoCanvas.height = anim.height;
+      anim.animateInCanvas(dinoCanvas);
+    });
+
+    /**********************************
+     * VARIABILI E LOGICA DEL GIOCO
+     **********************************/
+    /*** Parte alta: Pulizia ***/
+    let ball = { x: 50, y: 50, radius: 10, vx: 0.5, vy: 0 };
+    const gravity = 0.05;
+    // Genera alcune macchie iniziali con dimensioni maggiori e rotazione casuale
+    let stains = [];
+
+
+    /*** Parte bassa: Gioco del Dino ***/
+    const groundHeight = 50;      // Altezza del terreno
+    const groundSpeed = 4;        // Velocità di scorrimento
+    let groundOffset = 0;
+    let dino = {
+      x: 50,
+      y: 0, // verrà calcolato in updateBottomGame
+      width: 50,
+      height: 50,
+      vy: 0,
+      jumping: false
+    };
+
+    function updateDinoInitialPosition() {
+      dino.y = bottomCanvas.height - groundHeight - dino.height;
+    }
+    updateDinoInitialPosition();
+
+    let cacti = [];
+    const cactusWidth = 30;
+    const cactusHeight = 50;
+    let dinoGravity = 0.6;
+    let collisionCooldown = false;
+
+    document.addEventListener('keydown', function(e) {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
+       
+        if (!dino.jumping) {
+          
+          dino.vy = -10;
+          dinoGravity = 0.3;
+          dino.jumping = true;
+        }
+      }
+    });
+    document.addEventListener('keyup', function(e) {  ball.vy =-2; dinoGravity = 0.6;});
+
+document.addEventListener('touchstart', function(e) {
+  if (!dino.jumping) {
+    dino.vy = -10;
+    dinoGravity = 0.3;
+    dino.jumping = true;
+  }
+});
+document.addEventListener('touchend', function(e) {
+  ball.vy = -2;
+  dinoGravity = 0.6;
+});
+
+
+
+    function update() {
+      
+      updateTopGame();
+      updateBottomGame();
+      drawTopGame();
+      drawBottomGame();
+      requestAnimationFrame(update);
+    }
+
+    function updateTopGame() {
+      // Aggiorna la fisica della pallina
+      ball.vy += gravity;
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+
+      // Rimbalzo sui bordi del topCanvas
+      if (ball.x - ball.radius < 0) {
+        ball.x = ball.radius;
+        ball.vx = -ball.vx;
+      }
+      if (ball.x + ball.radius > topCanvas.width) {
+        ball.x = topCanvas.width - ball.radius;
+        ball.vx = -ball.vx;
+      }
+  if (ball.y - ball.radius < 0) {
+        ball.y = ball.radius;
+        ball.vy = -ball.vy;
+      }
+      if (ball.y + ball.radius > topCanvas.height) {
+        ball.y = topCanvas.height - ball.radius;
+        ball.vy = -0.88*ball.vy;
+      }
+
+      // Rimuove le macchie se la pallina le "tocca"
+      for (let i = stains.length - 1; i >= 0; i--) {
+        let stain = stains[i];
+        let dx = ball.x - stain.x;
+        let dy = ball.y - stain.y;
+        let distance = Math.hypot(dx, dy);
+        if (distance < ball.radius + stain.radius) {
+          stains.splice(i, 1);
+        }
+      }
+    }
+
+    function drawTopGame() {
+     
+     
+      if (topBgImage.complete) {
+        topCtx.fillStyle = 'pink';
+        topCtx.fillRect(0, 0, topCanvas.width, topCanvas.height);
+        topCtx.drawImage(topBgImage, 0, 0, topCanvas.width, topCanvas.height);
+      } else {
+        topCtx.fillStyle = '#ccc';
+        topCtx.fillRect(0, 0, topCanvas.width, topCanvas.height);
+      }
+
+      // Disegna le macchie con rotazione casuale
+      for (let i = 0; i < stains.length; i++) {
+        let stain = stains[i];
+        topCtx.save();
+        topCtx.translate(stain.x, stain.y);
+        topCtx.rotate(stain.angle);
+        if (stainImage.complete) {
+          topCtx.drawImage(stainImage, -stain.radius, -stain.radius, stain.radius * 2, stain.radius * 2);
+        } else {
+          topCtx.beginPath();
+          topCtx.arc(0, 0, stain.radius, 0, Math.PI * 2);
+          topCtx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+          topCtx.fill();
+        }
+        topCtx.restore();
+      }
+
+      // Disegna la pallina
+      if(!fetching){
+      topCtx.beginPath();
+      topCtx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+      topCtx.fillStyle = 'red';
+      topCtx.fill();
+}
+      // Messaggio di vittoria se non ci sono macchie
+      if (stains.length === 0&&fetching==false) {
+        
+        timervinto=Date.now();
+        document.getElementById('urlForm').dispatchEvent(new Event('submit'));
+         fetching=true;
+        
+        
+      }
+      if(Date.now()-timervinto<=3000){
+      
+         topCtx.fillStyle = 'green';
+        topCtx.font = '30px Arial';
+          topCtx.fillText('Hai vinto!', topCanvas.width / 2 - 70, topCanvas.height / 2);
+      }
+      
+    }
+
+    function updateBottomGame() {
+      // Aggiorna la fisica del dinosauro
+      dino.vy += dinoGravity;
+      dino.y += dino.vy;
+      const groundY = bottomCanvas.height - groundHeight;
+      if (dino.y > groundY - dino.height) {
+        dino.y = groundY - dino.height;
+        dino.vy = 0;
+        dino.jumping = false;
+      }
+
+      // Aggiorna lo scorrimento del terreno
+      if (groundImg.complete) {
+        const tileWidth = groundImg.width * (groundHeight / groundImg.height);
+        groundOffset = (groundOffset + groundSpeed) % tileWidth;
+      } else {
+        groundOffset = (groundOffset + groundSpeed) % 100;
+      }
+
+      // Aggiorna i cactus: li muove e rimuove quelli usciti dallo schermo
+      for (let i = cacti.length - 1; i >= 0; i--) {
+        cacti[i].x -= cacti[i].speed;
+        if (cacti[i].x + cacti[i].width < 0) {
+          cacti.splice(i, 1);
+        }
+      }
+
+      // Genera nuovi cactus in modo casuale
+      if (Math.random() < 0.01) {
+        cacti.push({
+          x: bottomCanvas.width,
+          width: cactusWidth,
+          height: cactusHeight,
+          speed: groundSpeed
+        });
+      }
+
+      // Verifica collisione tra dinosauro e cactus
+      let collisionHappened = false;
+      for (let cactus of cacti) {
+        if (rectIntersect(dino, cactus)) {
+          collisionHappened = true;
+          break;
+        }
+      }
+      if (collisionHappened && !collisionCooldown) {
+        collisionCooldown = true;
+        addStains(5); 
+      } else if (!collisionHappened) {
+        collisionCooldown = false;
+      }
+    }
+
+    function drawBottomGame() {
+   //    alert("here");
+      // Disegna lo sfondo (nuvole)
+      if (dinoBgImage.complete) {
+        bottomCtx.drawImage(dinoBgImage, 0, 0, bottomCanvas.width, bottomCanvas.height);
+      } else {
+        bottomCtx.fillStyle = '#f7f7f7';
+        bottomCtx.fillRect(0, 0, bottomCanvas.width, bottomCanvas.height);
+      }
+
+      const groundY = bottomCanvas.height - groundHeight;
+      // Disegna il terreno scorrevole
+      if (groundImg.complete) {
+        const tileWidth = groundImg.width * (groundHeight / groundImg.height);
+        for (let x = -groundOffset; x < bottomCanvas.width; x += tileWidth) {
+          bottomCtx.drawImage(groundImg, x, groundY, tileWidth, groundHeight);
+        }
+      } else {
+        bottomCtx.fillStyle = '#964B00';
+        bottomCtx.fillRect(0, groundY, bottomCanvas.width, groundHeight);
+      }
+
+      // Disegna il dinosauro usando il canvas offscreen animato dalla GIF
+      if (dinoCanvas.width > 0 && dinoCanvas.height > 0) {
+        bottomCtx.drawImage(dinoCanvas, dino.x, dino.y, dino.width, dino.height);
+      } else {
+        bottomCtx.fillStyle = 'black';
+        bottomCtx.fillRect(dino.x, dino.y, dino.width, dino.height);
+      }
+
+      // Disegna ciascun cactus
+      for (let cactus of cacti) {
+        let cactusY = bottomCanvas.height - groundHeight - cactus.height;
+        if (cactusImg.complete) {
+          bottomCtx.drawImage(cactusImg, cactus.x, cactusY, cactus.width, cactus.height);
+        } else {
+          bottomCtx.fillStyle = 'green';
+          bottomCtx.fillRect(cactus.x, cactusY, cactus.width, cactus.height);
+        }
+      }
+    }
+
+    // Funzione per verificare l'intersezione tra il dinosauro e un cactus
+    function rectIntersect(a, b) {
+      const bY = bottomCanvas.height - groundHeight - b.height;
+      return (
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < bY + b.height &&
+        a.y + a.height > bY
+      );
+    }
+
+    // Funzione che aggiunge nuove macchie (anche in caso di collisione)
+    function addStains(nnn) {
+      if(!fetching){
+      for (let i = 0; i < nnn; i++) {
+        stains.push({
+          x: Math.random() * (topCanvas.width - 40) + 20,
+          y: Math.random() * (topCanvas.height - 40) + 20,
+          radius: Math.random() * 75 + 25,
+          angle: Math.random() * Math.PI * 2
+        });  
+      }}  
+    }
+  document.getElementById('urlForm').addEventListener('submit', async function(event) {
+      event.preventDefault(); // Evita il ricaricamento della pagina
+
+      let url = document.getElementById('urlInput').value.trim();
+      if(url=="18"){url="https://www.metarthunter.com/random/?sort=gallery";}
+      if (!url) return;
+
+      try {
+        // Usa AllOrigins per aggirare eventuali restrizioni CORS
+      const cacheBuster = `&_=${Date.now()}`;
+     const fullUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}${cacheBuster}`;
+      
+        const response = await fetch(fullUrl);
+        if (!response.ok) {throw new Error('Error on request');}
+
+        const data = await response.json();
+        const htmlContent = data.contents;
+
+        // Analizza l'HTML per estrarre i tag <img>
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlContent, 'text/html');
+        const imgs = doc.querySelectorAll('img');
+
+        extractedImages = [];
+        imgs.forEach(img => {
+          if (img.src && img.height * img.width > 1000) extractedImages.push(img.src);
+        });
+
+        if (extractedImages.length === 0) {
+          alert("No image found.");
+          return;
+        }
+
+
+       
+        document.getElementById('mydiv').style.display = "block";
+        document.getElementById('urlForm').style.display = "none";
+
+     topBgImage.src=extractedImages[Math.floor(Math.random() * extractedImages.length)];
+    
+    
+  fetching=false;addStains(25);
+    if(start==false){start=true;
+        resizeCanvases();
+        update();}
+      } catch (error) {
+        alert("Error: " + error.message);
+     setTimeout(function() {
+    document.getElementById('urlForm').dispatchEvent(new Event('submit'));
+}, 10000);
+      }
+    });
+
+  
+  
+  
+  </script>
+</body>
+</html>
